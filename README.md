@@ -1,8 +1,8 @@
-# ⏱️ Azure VM Scheduler Resize Script
+#  Azure VM Scheduler Resize Script
 
 This Python script automatically resizes an Azure Virtual Machine (VM) based on the time of day. It uses Azure's Python SDK (`azure-mgmt-compute`) and `DefaultAzureCredential` for secure, automated authentication.
 
-## 📌 Features
+##  Features
 
 - Automatically checks current time and triggers resize:
   - At **11 PM** → Resizes VM to a smaller size (e.g., `Standard_D4s_v3`)
@@ -19,9 +19,151 @@ This Python script automatically resizes an Azure Virtual Machine (VM) based on 
 - Azure CLI logged in OR environment configured for `DefaultAzureCredential`
 - Azure subscription with permissions to manage the VM
 
-## 📦 Python Dependencies
+## Python Dependencies
 
 Install required packages:
 
 ```bash
 pip install azure-identity azure-mgmt-compute
+ Configuration
+Edit the script to match your Azure settings:
+
+subscription_id = 'YOUR_SUBSCRIPTION_ID'
+resource_group = 'YOUR_RESOURCE_GROUP'
+vm_name = 'YOUR_VM_NAME'
+Also customize the desired VM sizes:
+
+night_vm_size = 'Standard_D4s_v3'    # Size at 11 PM
+morning_vm_size = 'Standard_D8s_v3'  # Size at 7 AM
+ How It Works
+The script:
+
+Checks the current hour.
+
+If it’s 11 PM or 7 AM, it:
+
+Stops the VM
+
+Deallocates the VM (required before resizing)
+
+Resizes the VM to the target size
+
+Starts the VM again
+
+⏱ Scheduling
+You can schedule this script to run using:
+
+ Linux cron job
+Edit your crontab:
+
+
+crontab -e
+Add:
+
+0 23 * * * /usr/bin/python3 /path/to/your/script.py  # At 11 PM
+0 7 * * * /usr/bin/python3 /path/to/your/script.py   # At 7 AM
+ Azure Automation / Azure Function
+You can also package this script inside an Azure Function App or Azure Automation Runbook for a serverless solution.
+
+🛡 Authentication Notes
+This script uses:
+
+from azure.identity import DefaultAzureCredential
+Make sure one of the following authentication methods is configured:
+
+Azure CLI login (az login)
+
+Managed Identity (when running on Azure services)
+
+Environment variables for Service Principal credentials
+
+See Azure Identity Docs for more.
+
+ License
+MIT License
+
+Contributions
+Pull requests welcome. For major changes, open an issue first to discuss what you would like to change.
+
+
+---
+
+## File Structure
+
+azure-vm-scheduler-resize/
+├── README.md
+├── resize_vm.py
+├── requirements.txt
+
+
+---
+
+###  `resize_vm.py` (your existing script, just with minor formatting)
+
+from azure.identity import DefaultAzureCredential
+from azure.mgmt.compute import ComputeManagementClient
+from datetime import datetime
+
+#  Azure Configuration
+subscription_id = 'YOUR_SUBSCRIPTION_ID'
+resource_group = 'YOUR_RESOURCE_GROUP'
+vm_name = 'YOUR_VM_NAME'
+
+#  Define VM sizes for night and morning
+night_vm_size = 'Standard_D4s_v3'    # Size for 11 PM
+morning_vm_size = 'Standard_D8s_v3'  # Size for 7 AM
+
+#  Get current hour (24-hour format)
+current_hour = datetime.now().hour
+
+#  Authenticate
+credential = DefaultAzureCredential()
+compute_client = ComputeManagementClient(credential, subscription_id)
+
+#  Decide time-based action
+if current_hour == 23:
+    selected_size = night_vm_size
+    print(" 11 PM: Performing stop → resize → start")
+elif current_hour == 7:
+    selected_size = morning_vm_size
+    print(" 7 AM: Performing stop → resize → start")
+else:
+    print(" Not scheduled time. Exiting.")
+    exit()
+
+# 1️ Stop VM if running
+print("Stopping VM...")
+compute_client.virtual_machines.begin_power_off(resource_group, vm_name).result()
+
+# 2️ Deallocate VM (required before resizing)
+print("Deallocating VM...")
+compute_client.virtual_machines.begin_deallocate(resource_group, vm_name).result()
+
+# 3️ Resize VM
+print(f"Resizing VM to {selected_size}...")
+vm = compute_client.virtual_machines.get(resource_group, vm_name)
+vm.hardware_profile.vm_size = selected_size
+compute_client.virtual_machines.begin_create_or_update(resource_group, vm_name, vm).result()
+
+# 4 Start VM
+print("Starting VM...")
+compute_client.virtual_machines.begin_start(resource_group, vm_name).result()
+
+print(" VM resized and restarted successfully.")
+ requirements.txt
+sql
+
+azure-identity
+azure-mgmt-compute
+ Final Step: Push to GitHub
+1. Initialize repo
+
+
+git init
+git add .
+git commit -m "Initial commit: Azure VM time-based auto-resize script"
+2. Create GitHub repository (e.g., via GitHub UI or CLI)
+bash
+
+gh repo create azure-vm-scheduler-resize --public --source=. --remote=origin
+git push -u origin main
